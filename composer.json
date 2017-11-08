@@ -1,0 +1,27 @@
+{
+  "name": "geniv/nette-translator",
+  "description": "Translator extension for Nette Framework",
+  "keywords": [
+    "nette",
+    "translator",
+    "geniv"
+  ],
+  "license": "GPL-3.0",
+  "authors": [
+    {
+      "name": "Radek Fryšták",
+      "email": "geniv.radek@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=5.6.0",
+    "nette/nette": ">=2.4.0",
+    "dibi/dibi": ">=3.0.0",
+    "geniv/nette-locale": ">=1.0.0"
+  },
+  "autoload": {
+    "classmap": [
+      "src/"
+    ]
+  }
+}
