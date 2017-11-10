@@ -1,0 +1,28 @@
+{
+  "name": "geniv/nette-static-router",
+  "description": "Static alias router extension for Nette Framework",
+  "keywords": [
+    "nette",
+    "static",
+    "alias",
+    "router",
+    "geniv"
+  ],
+  "license": "GPL-3.0",
+  "authors": [
+    {
+      "name": "Radek Fryšták",
+      "email": "geniv.radek@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=7.0.0",
+    "nette/nette": ">=2.4.0",
+    "geniv/nette-locale": ">=1.0.0"
+  },
+  "autoload": {
+    "classmap": [
+      "src/"
+    ]
+  }
+}
