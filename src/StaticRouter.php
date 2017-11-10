@@ -1,144 +1,282 @@
-<?php
+<?php declare(strict_types=1);
+
+namespace StaticRouter;
+
+use Exception;
+use Locale\Locale;
+use Nette\Application\IRouter;
+use Nette\Application\Request;
+use Nette\Http\IRequest;
+use Nette\Http\Url;
+use Nette\SmartObject;
+
 
 /**
  * Class StaticRouter
  *
  * @author  geniv
- * @package NetteWeb
  */
-class StaticRouter implements \Nette\Application\IRouter
+class StaticRouter implements IRouter
 {
-    use Nette\SmartObject;
+    use SmartObject;
 
-    private $metadata, $flags;
-    /** @var BaseLanguageService */
-    private $language;
-    private $slugs = null;
+    /** @var bool default inactive https */
+    private $secure = false;
+    /** @var bool default inactive one way router */
+    private $oneWay = false;
+    /** @var array default parameters */
+    private $defaultParameters = [];
+    /** @var string paginator variable */
+    private $praginatorVariable = 'vp';
+    /** @var array domain locale switch */
+    private $domain = [];
+
+    /** @var array */
+    private $route = [];
+    /** @var Locale */
+    private $locale = null;
 
 
     /**
      * StaticRouter constructor.
-     * @param \Nette\DI\Container $context
-     * @param $slugs
-     * @param array $metadata
-     * @param int $flags
+     *
+     * @param array  $parameters
+     * @param Locale $locale
+     * @throws Exception
      */
-    public function __construct(\Nette\DI\Container $context, $slugs, $metadata = [], $flags = 0)
+    public function __construct(array $parameters, Locale $locale)
     {
-        $this->slugs = $slugs;
+        // pokud jeden z parametru domainSwitch nebo domainAlias neexistuje
+        if (isset($parameters['domainSwitch']) XOR isset($parameters['domainAlias'])) {
+            throw new Exception('Domain switch or domain alias is not defined in configure! ([domainSwitch: true, domainAlias: [cs: example.cz]])');
+        }
 
-        $this->language = $context->getByType(\BaseLanguageService::class);
+        // nacteni domain nastaveni
+        if (isset($parameters['domainSwitch']) && isset($parameters['domainAlias'])) {
+            $this->domain = [
+                'switch' => $parameters['domainSwitch'],
+                'alias'  => $parameters['domainAlias'],
+            ];
+        }
 
-        $this->metadata = $metadata;
-        $this->flags = $flags;
+        $this->route = $parameters['route'];
+        $this->locale = $locale;
+    }
+
+
+    /**
+     * Enable https, defalt is disable.
+     *
+     * @param $secure
+     * @return StaticRouter
+     */
+    public function setSecure(bool $secure): self
+    {
+        $this->secure = $secure;
+        return $this;
+    }
+
+
+    /**
+     * Enable one way router.
+     *
+     * @param bool $oneWay
+     * @return StaticRouter
+     */
+    public function setOneWay(bool $oneWay): self
+    {
+        $this->oneWay = $oneWay;
+        return $this;
+    }
+
+
+    /**
+     * Set default parameters, presenter, action and locale.
+     *
+     * @param string $presenter
+     * @param string $action
+     * @param string $locale
+     * @return StaticRouter
+     */
+    public function setDefaultParameters(string $presenter, string $action, string $locale): self
+    {
+        $this->defaultParameters = [
+            'presenter' => $presenter,
+            'action'    => $action,
+            'locale'    => $locale,
+        ];
+        return $this;
+    }
+
+
+    /**
+     * Set paginator variable.
+     *
+     * @param string $variable
+     * @return StaticRouter
+     */
+    public function setPaginatorVariable(string $variable): self
+    {
+        $this->praginatorVariable = $variable;
+        return $this;
+    }
+
+
+    /**
+     * Get array url domains.
+     *
+     * Use in AliasRouter::match().
+     *
+     * @return array
+     */
+    public function getDomain(): array
+    {
+        return $this->domain;
+    }
+
+
+    /**
+     * Get locale code, empty code for default locale.
+     *
+     * Use in AliasRouter::constructUrl().
+     *
+     * @param $parameters
+     * @return string
+     */
+    public function getCodeLocale(array $parameters): string
+    {
+        // null locale => empty locale in url
+        if (!isset($parameters['locale'])) {
+            return '';
+        }
+
+        // nuluje lokalizaci pri hlavnim jazyku a domain switch
+        if (isset($parameters['locale']) && $parameters['locale'] == $this->locale->getCodeDefault() || ($this->domain && $this->domain['switch'])) {
+            return '';
+        }
+        return $parameters['locale'];
     }
 
 
     /**
      * Maps HTTP request to a Request object.
-     * @param \Nette\Http\IRequest $httpRequest
-     * @return \Nette\Application\Request|null
+     *
+     * @param IRequest $httpRequest
+     * @return Request|null
      */
-    public function match(Nette\Http\IRequest $httpRequest)
+    public function match(IRequest $httpRequest)
     {
-        $slug = $httpRequest->getUrl()->getPathInfo();
-        $presenter = null;
-        $parameters = [];
+        $pathInfo = $httpRequest->getUrl()->getPathInfo();
 
-        // vlozeni defaultnich hodnot pri prazdne adrese
-        if (!$slug && $this->metadata) {
-            $parameters = $this->metadata;  // vlozeni parametru z metadat
-            // pokud je definovany presenter tak ho preda dal a promaze index
-            if (isset($parameters['presenter'])) {
-                $presenter = $parameters['presenter'];
-                unset($parameters['presenter']);
+        // parse locale
+        $locale = $this->defaultParameters['locale'];
+        if (preg_match('/((?<locale>[a-z]{2})\/)?/', $pathInfo, $m) && isset($m['locale'])) {
+            $locale = trim($m['locale'], '/_');
+            $pathInfo = trim(substr($pathInfo, strlen($m['locale'])), '/_');   // ocesani slugu
+        }
+
+        // vyber jazyka podle domeny
+        $domain = $this->domain['alias'];
+        if ($this->domain && $this->domain['switch']) {
+            $host = $httpRequest->url->host;    // nacteni url hostu pro zvoleni jazyka
+            if (isset($domain[$host])) {
+                $locale = $domain[$host];
             }
         }
 
-        // separace jazyku a slugu
-        $separate = \Nette\Utils\Strings::match($slug, '/(?<lang>[a-z]{2}\/)?(?<slug>[[:alnum:]\-\_\/]+)/');
-
-        // separace jazyku a nastaveni do systemu
-        $lang = $this->language->getMainLang();
-        if (isset($separate['lang']) && $separate['lang']) {
-            $lang = trim($separate['lang'], '/_');
+        // parse alias
+        $alias = null;
+        if (preg_match('/((?<alias>[a-z0-9-\/]+)(\/)?)?/', $pathInfo, $m) && isset($m['alias'])) {
+            $alias = trim($m['alias'], '/_');
+            $pathInfo = trim(substr($pathInfo, strlen($m['alias'])), '/_');   // ocesani jazyka od slugu
         }
-        $this->language->setLang($lang);
 
-        // nacteni separovaneho slugu
-        $separeSlug = (isset($separate['slug']) ? $separate['slug'] : null);
+        // parse paginator
+        $parameters = [];
+        if (preg_match('/((?<vp>[a-z0-9-]+)(\/)?)?/', $pathInfo, $m) && isset($m['vp'])) {
+            $parameters[$this->praginatorVariable] = trim($m['vp'], '/_');
+        }
 
-        if ($separeSlug) {
-            if (isset($this->slugs[$lang][$separeSlug])) {
-                $match = \Nette\Utils\Strings::match($this->slugs[$lang][$separeSlug], '/(?<presenter>[[:alnum:]]{2,})(:(?<action>[[:alnum:]]+))?/');
+        // set default presenter
+        $presenter = $this->defaultParameters['presenter'];
 
-                // nastaveni presenteru
-                $presenter = $match['presenter'];
+        // set locale to parameters
+        $parameters['locale'] = $locale;
 
-                // parametry prenasene dal
-                $parameters = [
-                    'lang' => $lang,
-                    'action' => (isset($match['action']) ? $match['action'] : null),
-                ];
+        // akceptace adresy kde je na konci zbytecne lomitko, odebere posledni lomitko
+        if ($alias) {
+            $alias = rtrim($alias, '/_');
+        }
+
+        if ($alias) {
+            if (isset($this->route[$locale])) {
+                if (isset($this->route[$locale][$alias])) {
+                    list($presenter, $action) = explode(':', $this->route[$locale][$alias]);
+                    $parameters['action'] = $action;
+                } else {
+                    return null;
+                }
             } else {
                 return null;
             }
         }
 
-        // prevzeti externich parametru a slozeni parametur
         $parameters += $httpRequest->getQuery();
 
-        // ochrana proti prazdnemu presenteru
         if (!$presenter) {
             return null;
         }
 
-        return new Nette\Application\Request(
+        return new Request(
             $presenter,
             $httpRequest->getMethod(),
             $parameters,
             $httpRequest->getPost(),
             $httpRequest->getFiles(),
-            [Nette\Application\Request::SECURED => $httpRequest->isSecured()]
+            [Request::SECURED => $httpRequest->isSecured()]
         );
     }
 
 
     /**
      * Constructs absolute URL from Request object.
-     * @param \Nette\Application\Request $appRequest
-     * @param \Nette\Http\Url $refUrl
+     *
+     * @param Request $appRequest
+     * @param Url     $refUrl
      * @return null|string
      */
-    public function constructUrl(Nette\Application\Request $appRequest, \Nette\Http\Url $refUrl)
+    public function constructUrl(Request $appRequest, Url $refUrl)
     {
-        if ($this->flags & self::ONE_WAY) {
+        if ($this->oneWay) {
             return null;
         }
 
-        $params = $appRequest->parameters;
-        $adr = $appRequest->presenterName . ':' . (isset($params['action']) ? $params['action'] : '');
+        $parameters = $appRequest->parameters;
 
-        $slug = null;
-        $lang = isset($params['lang']) ? $params['lang'] : null;
-        if (isset($this->slugs[$lang])) {
-            $slug = array_search($adr, $this->slugs[$lang], true);
-        }
+        $locale = (isset($parameters['locale']) ? $parameters['locale'] : '');
+        $presenterAction = $appRequest->presenterName . ':' . (isset($parameters['action']) ? $parameters['action'] : '');
 
-        if ($slug) {
-            // pokud je jiny jazyk nez hlavni predhazuje jazyk
-            if ($lang != $this->language->getMainLang()) {
-                $slug = $lang . '/' . $slug;
-            }
-            // vyhozeni parametru
-            unset($params['lang'], $params['action']);
+        if (isset($this->route[$locale]) && ($row = array_search($presenterAction, $this->route[$locale], true)) != null) {
+            $part = implode('/', array_filter([$this->getCodeLocale($parameters), $row]));
+            $alias = trim(isset($parameters[$this->praginatorVariable]) ? implode('_', [$part, $parameters[$this->praginatorVariable]]) : $part, '/_');
 
-            $url = new Nette\Http\Url($refUrl->getBaseUrl() . $slug);
-            $url->setScheme($this->flags & self::SECURED ? 'https' : 'http');
-            $url->setQuery($params);
+            unset($parameters['locale'], $parameters['action'], $parameters['alias'], $parameters['id'], $parameters[$this->praginatorVariable]);
+
+            // create url address
+            $url = new Url($refUrl->getBaseUrl() . $alias);
+            $url->setScheme($this->secure ? 'https' : 'http');
+            $url->setQuery($parameters);
             return $url->getAbsoluteUrl();
         } else {
-            return null;
+            // vyber jazyka podle domeny
+            // pokud je aktivni detekce podle domeny tak preskakuje FORWARD metodu nebo Homepage presenter
+            // jde o vyhazovani lokalizace na HP pri zapnutem domain switch
+            if ($this->domain && $this->domain['switch'] && ($appRequest->method != 'FORWARD' || $appRequest->presenterName == 'Homepage')) {
+                $url = new Url($refUrl->getBaseUrl());  // vytvari zakladni cestu bez parametru
+                $url->setScheme($this->secure ? 'https' : 'http');
+                return $url->getAbsoluteUrl();
+            }
         }
+        return null;
     }
 }
