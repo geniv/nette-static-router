@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 
 namespace StaticRouter;
 
@@ -67,10 +67,10 @@ class StaticRouter implements IRouter
     /**
      * Enable https, defalt is disable.
      *
-     * @param $secure
-     * @return StaticRouter
+     * @param bool $secure
+     * @return $this
      */
-    public function setSecure(bool $secure): self
+    public function setSecure(bool $secure)
     {
         $this->secure = $secure;
         return $this;
@@ -80,10 +80,10 @@ class StaticRouter implements IRouter
     /**
      * Enable one way router.
      *
-     * @param bool $oneWay
-     * @return StaticRouter
+     * @param $oneWay
+     * @return $this
      */
-    public function setOneWay(bool $oneWay): self
+    public function setOneWay($oneWay)
     {
         $this->oneWay = $oneWay;
         return $this;
@@ -93,12 +93,12 @@ class StaticRouter implements IRouter
     /**
      * Set default parameters, presenter, action and locale.
      *
-     * @param string $presenter
-     * @param string $action
-     * @param string $locale
-     * @return StaticRouter
+     * @param $presenter
+     * @param $action
+     * @param $locale
+     * @return $this
      */
-    public function setDefaultParameters(string $presenter, string $action, string $locale): self
+    public function setDefaultParameters($presenter, $action, $locale)
     {
         $this->defaultParameters = [
             'presenter' => $presenter,
@@ -112,10 +112,10 @@ class StaticRouter implements IRouter
     /**
      * Set paginator variable.
      *
-     * @param string $variable
-     * @return StaticRouter
+     * @param $variable
+     * @return $this
      */
-    public function setPaginatorVariable(string $variable): self
+    public function setPaginatorVariable($variable)
     {
         $this->praginatorVariable = $variable;
         return $this;
@@ -129,7 +129,7 @@ class StaticRouter implements IRouter
      *
      * @return array
      */
-    public function getDomain(): array
+    public function getDomain()
     {
         return $this->domain;
     }
@@ -143,7 +143,7 @@ class StaticRouter implements IRouter
      * @param $parameters
      * @return string
      */
-    public function getCodeLocale(array $parameters): string
+    public function getCodeLocale(array $parameters)
     {
         // null locale => empty locale in url
         if (!isset($parameters['locale'])) {
