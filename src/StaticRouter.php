@@ -3,7 +3,7 @@
 namespace StaticRouter;
 
 use Exception;
-use Locale\Locale;
+use Locale\ILocale;
 use Nette\Application\IRouter;
 use Nette\Application\Request;
 use Nette\Http\IRequest;
@@ -33,18 +33,18 @@ class StaticRouter implements IRouter
 
     /** @var array */
     private $route = [];
-    /** @var Locale */
+    /** @var ILocale */
     private $locale = null;
 
 
     /**
      * StaticRouter constructor.
      *
-     * @param array  $parameters
-     * @param Locale $locale
+     * @param array   $parameters
+     * @param ILocale $locale
      * @throws Exception
      */
-    public function __construct(array $parameters, Locale $locale)
+    public function __construct(array $parameters, ILocale $locale)
     {
         // pokud jeden z parametru domainSwitch nebo domainAlias neexistuje
         if (isset($parameters['domainSwitch']) XOR isset($parameters['domainAlias'])) {
@@ -70,7 +70,7 @@ class StaticRouter implements IRouter
      * @param bool $secure
      * @return $this
      */
-    public function setSecure(bool $secure)
+    public function setSecure($secure)
     {
         $this->secure = $secure;
         return $this;
