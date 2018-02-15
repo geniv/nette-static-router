@@ -16,7 +16,7 @@ class Extension extends CompilerExtension
 {
     /** @var array default values */
     private $defaults = [
-        'autowired'    => 'self',
+        'autowired'    => null,
         'domainSwitch' => false,
         'domainAlias'  => [],
         'route'        => [],
@@ -33,12 +33,7 @@ class Extension extends CompilerExtension
 
         // define router
         $builder->addDefinition($this->prefix('default'))
-            ->setFactory(StaticRouter::class, [$config]);
-
-        // if define autowired then set value
-        if (isset($config['autowired'])) {
-            $builder->getDefinition($this->prefix('default'))
-                ->setAutowired($config['autowired']);
-        }
+            ->setFactory(StaticRouter::class, [$config])
+            ->setAutowired($config['autowired']);
     }
 }

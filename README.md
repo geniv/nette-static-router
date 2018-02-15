@@ -1,6 +1,5 @@
 Static router
 =============
-Static alias router
 
 Installation
 ------------
@@ -25,7 +24,7 @@ neon configure:
 ```neon
 # static router
 staticRouter:
-#   autowired: self     # default self, true|false|self|null
+#   autowired: false
 #   domainSwitch: false
 #   domainAlias:
 #        example.cz: cs
