@@ -16,7 +16,7 @@ class Extension extends CompilerExtension
 {
     /** @var array default values */
     private $defaults = [
-        'autowired'    => null,
+        'autowired'    => 'self',
         'domainSwitch' => false,
         'domainAlias'  => [],
         'route'        => [],

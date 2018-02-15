@@ -24,7 +24,7 @@ neon configure:
 ```neon
 # static router
 staticRouter:
-#   autowired: false
+#   autowired: self
 #   domainSwitch: false
 #   domainAlias:
 #        example.cz: cs
